@@ -12,17 +12,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Component
 public class RouteDataImporter implements ApplicationRunner {
 
     private static final String DATA_FILE = "data/routes.csv";
-    private static final String AGENCY_NAME = "Gurugram Metropolitan City Bus Limited";
+
+    private static final String AGENCY_NAME =
+            "Gurugram Metropolitan City Bus Limited";
+
     private static final String AGENCY_CODE = "GMCBL";
 
     private final AgencyRepository agencyRepository;
@@ -39,9 +43,17 @@ public class RouteDataImporter implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) throws Exception {
+
         Agency agency = getOrCreateAgency();
 
+        Set<String> sourceRouteCodes = new HashSet<>();
+
+        int inserted = 0;
+        int updated = 0;
+        int deactivated = 0;
+
         try (Reader reader = openDataFile()) {
+
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader()
@@ -49,54 +61,105 @@ public class RouteDataImporter implements ApplicationRunner {
                     .get()
                     .parse(reader);
 
-            int imported = 0;
-            int skipped = 0;
-
             for (CSVRecord record : records) {
-                String routeCode = record.get("route_code").trim();
 
-                if (routeRepository
-                        .findByAgencyIdAndRouteCode(agency.getId(), routeCode)
-                        .isPresent()) {
-                    skipped++;
-                    continue;
-                }
-
-                Route route = new Route(
-                        agency.getId(),
-                        routeCode,
-                        record.get("source").trim()
-                                + " → "
-                                + record.get("destination").trim(),
-                        null,
-                        OffsetDateTime.now()
+                String routeCode = required(
+                        record.get("route_code"),
+                        "route_code"
                 );
 
-                routeRepository.save(route);
-                imported++;
-            }
+                String source = required(
+                        record.get("source"),
+                        "source"
+                );
 
-            System.out.println(
-                    "Route import completed. Imported: "
-                            + imported
-                            + ", Skipped: "
-                            + skipped
-            );
+                String destination = required(
+                        record.get("destination"),
+                        "destination"
+                );
+
+                sourceRouteCodes.add(routeCode);
+
+                var existingRoute =
+                        routeRepository.findByAgencyIdAndRouteCode(
+                                agency.getId(),
+                                routeCode
+                        );
+
+                if (existingRoute.isPresent()) {
+
+                    Route route = existingRoute.get();
+
+                    route.updateFromSource(
+                            source,
+                            destination,
+                            null
+                    );
+
+                    routeRepository.save(route);
+
+                    updated++;
+
+                } else {
+
+                    Route route = new Route(
+                            agency.getId(),
+                            routeCode,
+                            source,
+                            destination,
+                            null,
+                            OffsetDateTime.now()
+                    );
+
+                    routeRepository.save(route);
+
+                    inserted++;
+                }
+            }
         }
+
+        /*
+         * Anything currently active in DB but absent from
+         * the source CSV is considered inactive.
+         */
+        for (Route route : routeRepository.findAllByAgencyId(
+                agency.getId()
+        )) {
+
+            if (route.isActive()
+                    && !sourceRouteCodes.contains(route.getRouteCode())) {
+
+                route.deactivate();
+                routeRepository.save(route);
+
+                deactivated++;
+            }
+        }
+
+        System.out.println(
+                "Route synchronization completed. "
+                        + "Inserted: " + inserted
+                        + ", Updated: " + updated
+                        + ", Deactivated: " + deactivated
+        );
     }
 
     private Agency getOrCreateAgency() {
+
         return agencyRepository.findByCode(AGENCY_CODE)
-                .orElseGet(() -> agencyRepository.save(
-                        new Agency(
-                                AGENCY_NAME,
-                                AGENCY_CODE,
-                                OffsetDateTime.now()
+                .orElseGet(() ->
+                        agencyRepository.save(
+                                new Agency(
+                                        AGENCY_NAME,
+                                        AGENCY_CODE,
+                                        OffsetDateTime.now()
+                                )
                         )
-                ));
+                );
     }
 
     private Reader openDataFile() {
+
         var inputStream = getClass()
                 .getClassLoader()
                 .getResourceAsStream(DATA_FILE);
@@ -108,7 +171,22 @@ public class RouteDataImporter implements ApplicationRunner {
         }
 
         return new BufferedReader(
-                new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+                new InputStreamReader(
+                        inputStream,
+                        StandardCharsets.UTF_8
+                )
         );
+    }
+
+    private String required(String value, String fieldName) {
+
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(
+                    "Invalid routes.csv: " + fieldName
+                            + " cannot be blank"
+            );
+        }
+
+        return value.trim();
     }
 }
