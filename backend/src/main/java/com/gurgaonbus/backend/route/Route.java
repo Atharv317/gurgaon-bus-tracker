@@ -37,6 +37,19 @@ public class Route {
 
     protected Route() {
     }
+    public Route(
+            Long agencyId,
+            String routeCode,
+            String name,
+            String description,
+            OffsetDateTime createdAt
+    ) {
+        this.agencyId = agencyId;
+        this.routeCode = routeCode;
+        this.name = name;
+        this.description = description;
+        this.createdAt = createdAt;
+    }
 
     public Long getId() {
         return id;
