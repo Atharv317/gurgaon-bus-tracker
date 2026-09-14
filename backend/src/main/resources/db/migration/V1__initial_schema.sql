@@ -40,7 +40,7 @@ CREATE INDEX idx_route_agency_id
 
 CREATE TABLE stop (
     id BIGSERIAL PRIMARY KEY,
-    stop_code VARCHAR(50) UNIQUE,
+    stop_code VARCHAR(100) UNIQUE,
     name VARCHAR(200) NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,

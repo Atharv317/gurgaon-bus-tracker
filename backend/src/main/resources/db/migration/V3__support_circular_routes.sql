@@ -1,0 +1,2 @@
+ALTER TABLE route_stop
+DROP CONSTRAINT IF EXISTS uq_route_stop;

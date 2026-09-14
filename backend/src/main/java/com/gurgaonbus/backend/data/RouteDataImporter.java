@@ -19,6 +19,9 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Component
 public class RouteDataImporter implements ApplicationRunner {
 
@@ -28,6 +31,9 @@ public class RouteDataImporter implements ApplicationRunner {
             "Gurugram Metropolitan City Bus Limited";
 
     private static final String AGENCY_CODE = "GMCBL";
+
+    private static final Logger log =
+            LoggerFactory.getLogger(StopDataImporter.class);
 
     private final AgencyRepository agencyRepository;
     private final RouteRepository routeRepository;
@@ -136,11 +142,11 @@ public class RouteDataImporter implements ApplicationRunner {
             }
         }
 
-        System.out.println(
-                "Route synchronization completed. "
-                        + "Inserted: " + inserted
-                        + ", Updated: " + updated
-                        + ", Deactivated: " + deactivated
+        log.info(
+                "Route synchronization completed. inserted={}, updated={}, deactivated={}",
+                inserted,
+                updated,
+                deactivated
         );
     }
 

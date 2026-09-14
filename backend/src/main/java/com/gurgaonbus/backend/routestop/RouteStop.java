@@ -7,8 +7,8 @@ import jakarta.persistence.*;
         name = "route_stop",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uq_route_stop",
-                        columnNames = {"route_id", "direction", "stop_id"}
+                        name = "uq_route_stop_sequence",
+                        columnNames = {"route_id", "direction", "stop_sequence"}
                 )
         }
 )
@@ -32,7 +32,7 @@ public class RouteStop {
 
     protected RouteStop() {
     }
-    RouteStop(
+    public RouteStop(
             Long routeId,
             Long stopId,
             Integer stopSequence,
